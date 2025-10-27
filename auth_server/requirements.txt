@@ -1,0 +1,22 @@
+# SIAC Authorization Server - Dependencias
+# Microservicio minimalista para OAuth 2.1
+
+# Framework web
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+
+# Validación de datos
+pydantic==2.5.0
+
+# Logging y utilidades
+python-multipart==0.0.6
+
+# Seguridad (para producción)
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+
+# Utilidades adicionales
+python-dotenv==1.0.0
+
+
+

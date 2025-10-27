@@ -1,0 +1,70 @@
+# Traefik - Docker Compose Configuration
+# Reverse proxy con SSL/TLS automático via Let's Encrypt
+
+version: '3.8'
+
+services:
+  traefik:
+    image: traefik:v2.10
+    container_name: traefik
+    restart: unless-stopped
+    
+    # Puertos
+    ports:
+      - "80:80"      # HTTP
+      - "443:443"    # HTTPS
+      - "8080:8080"  # Dashboard (solo acceso local)
+    
+    # Variables de entorno
+    environment:
+      - TZ=America/Bogota
+    
+    # Volúmenes
+    volumes:
+      # Socket de Docker (para auto-discovery de servicios)
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      
+      # Configuración de Traefik
+      - ./traefik.yml:/etc/traefik/traefik.yml:ro
+      
+      # Directorio para configuración dinámica (opcional)
+      - ./dynamic:/etc/traefik/dynamic:ro
+      
+      # Almacenamiento de certificados Let's Encrypt
+      - ./letsencrypt:/letsencrypt
+    
+    # Redes
+    networks:
+      - traefik-public
+    
+    # Labels para el dashboard
+    labels:
+      - "traefik.enable=true"
+      
+      # Dashboard (acceso local)
+      - "traefik.http.routers.traefik-dashboard.rule=Host(`traefik.localhost`)"
+      - "traefik.http.routers.traefik-dashboard.entrypoints=web"
+      - "traefik.http.routers.traefik-dashboard.service=api@internal"
+    
+    # Health check
+    healthcheck:
+      test: ["CMD", "traefik", "healthcheck", "--ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    
+    # Logging
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+# Redes
+networks:
+  traefik-public:
+    name: traefik-public
+    driver: bridge
+
+

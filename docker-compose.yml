@@ -1,0 +1,58 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database Service
+  db:
+    image: postgres:15-alpine
+    container_name: siac_postgres
+    environment:
+      POSTGRES_DB: siac_chatgpt
+      POSTGRES_USER: siac
+      POSTGRES_PASSWORD: siac123
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-scripts:/docker-entrypoint-initdb.d
+    networks:
+      - siac_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U siac -d siac_chatgpt"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # FastMCP Backend Service
+  backend:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: siac_backend
+    environment:
+      - DATABASE_URL=postgresql://siac:siac123@db:5432/siac_chatgpt
+      - PYTHONPATH=/app
+      - PYTHONUNBUFFERED=1
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./server:/app
+      - /app/venv
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - siac_network
+    restart: unless-stopped
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  siac_network:
+    driver: bridge
+
+

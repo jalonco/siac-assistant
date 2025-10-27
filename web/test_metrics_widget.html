@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SIAC Assistant - Campaign Metrics Widget Test</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #f5f5f5;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+        .container {
+            max-width: 100%;
+            margin: 0;
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+            margin: 20px 0;
+            padding: 0 20px;
+        }
+        .test-section {
+            margin-bottom: 20px;
+            padding: 20px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .test-section h2 {
+            color: #555;
+            margin-top: 0;
+        }
+        .fullscreen-container {
+            height: 100vh;
+            overflow: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>SIAC Assistant - Campaign Metrics Widget Test</h1>
+        
+        <div class="test-section">
+            <h2>GREEN Quality Score Campaign</h2>
+            <div class="fullscreen-container" id="metrics-green"></div>
+        </div>
+        
+        <div class="test-section">
+            <h2>YELLOW Quality Score Campaign (Warning)</h2>
+            <div class="fullscreen-container" id="metrics-yellow"></div>
+        </div>
+        
+        <div class="test-section">
+            <h2>RED Quality Score Campaign (Critical)</h2>
+            <div class="fullscreen-container" id="metrics-red"></div>
+        </div>
+        
+        <div class="test-section">
+            <h2>Campaign with Template Pacing</h2>
+            <div class="fullscreen-container" id="metrics-pacing"></div>
+        </div>
+        
+        <div class="test-section">
+            <h2>Campaign with Meta Error 131049</h2>
+            <div class="fullscreen-container" id="metrics-error"></div>
+        </div>
+    </div>
+
+    <!-- React and ReactDOM from CDN -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    
+    <!-- Our bundled component -->
+    <script type="module" src="dist/campaign-metrics-widget.js"></script>
+    
+    <script type="module">
+        import CampaignMetricsWidget from './dist/campaign-metrics-widget.js';
+        
+        const { createElement: h } = React;
+        const { createRoot } = ReactDOM;
+        
+        // Mock ChatGPT Skybridge API for testing
+        window.openai = {
+            toolOutput: {
+                campaign_id: 'campaign_welcome_offer_123456',
+                delivery_rate: 0.95,
+                status: 'COMPLETED',
+                quality_score: 'GREEN',
+                total_sent: 1250,
+                delivered: 1187,
+                failed: 63,
+                performance_metrics: {
+                    delivery_rate: 0.95,
+                    open_rate: 0.23,
+                    click_rate: 0.05,
+                    response_rate: 0.02
+                },
+                quality_metrics: {
+                    quality_score: 'GREEN',
+                    spam_score: 0.01,
+                    engagement_score: 0.15
+                },
+                timeline: {
+                    started_at: '2024-01-20T10:00:00Z',
+                    completed_at: '2024-01-20T18:30:00Z',
+                    duration_hours: 8.5
+                },
+                cost_analysis: {
+                    total_cost: 18.75,
+                    cost_per_message: 0.015,
+                    cost_per_delivery: 0.016
+                },
+                pacing_status: {
+                    template_pacing_active: false,
+                    held_messages: 0
+                },
+                meta_errors: []
+            },
+            widgetState: {
+                campaign_id: 'campaign_welcome_offer_123456',
+                time_filter: '30d',
+                selected_metric: 'delivery',
+                last_updated: new Date().toISOString()
+            },
+            setWidgetState: async (state) => {
+                console.log('Mock setWidgetState:', state);
+                alert(`Mock: Saving widget state: ${JSON.stringify(state)}`);
+            },
+            requestDisplayMode: async (mode) => {
+                console.log('Mock requestDisplayMode:', mode);
+                alert(`Mock: Requesting ${mode} display mode`);
+            }
+        };
+        
+        // Test data for different scenarios
+        const greenCampaignData = {
+            toolOutput: {
+                campaign_id: 'campaign_green_123456',
+                delivery_rate: 0.98,
+                status: 'COMPLETED',
+                quality_score: 'GREEN',
+                total_sent: 2000,
+                delivered: 1960,
+                failed: 40,
+                performance_metrics: {
+                    delivery_rate: 0.98,
+                    open_rate: 0.28,
+                    click_rate: 0.08,
+                    response_rate: 0.04
+                },
+                quality_metrics: {
+                    quality_score: 'GREEN',
+                    spam_score: 0.005,
+                    engagement_score: 0.22
+                },
+                timeline: {
+                    started_at: '2024-01-20T10:00:00Z',
+                    completed_at: '2024-01-20T16:00:00Z',
+                    duration_hours: 6
+                },
+                cost_analysis: {
+                    total_cost: 30.00,
+                    cost_per_message: 0.015,
+                    cost_per_delivery: 0.015
+                },
+                pacing_status: {
+                    template_pacing_active: false,
+                    held_messages: 0
+                },
+                meta_errors: []
+            },
+            widgetState: {
+                campaign_id: 'campaign_green_123456',
+                time_filter: '30d',
+                selected_metric: 'delivery',
+                last_updated: new Date().toISOString()
+            }
+        };
+        
+        const yellowCampaignData = {
+            toolOutput: {
+                campaign_id: 'campaign_yellow_789012',
+                delivery_rate: 0.85,
+                status: 'RUNNING',
+                quality_score: 'YELLOW',
+                total_sent: 1500,
+                delivered: 1275,
+                failed: 225,
+                performance_metrics: {
+                    delivery_rate: 0.85,
+                    open_rate: 0.15,
+                    click_rate: 0.02,
+                    response_rate: 0.01
+                },
+                quality_metrics: {
+                    quality_score: 'YELLOW',
+                    spam_score: 0.08,
+                    engagement_score: 0.08
+                },
+                timeline: {
+                    started_at: '2024-01-20T10:00:00Z',
+                    completed_at: null,
+                    duration_hours: null
+                },
+                cost_analysis: {
+                    total_cost: 22.50,
+                    cost_per_message: 0.015,
+                    cost_per_delivery: 0.018
+                },
+                pacing_status: {
+                    template_pacing_active: false,
+                    held_messages: 0
+                },
+                meta_errors: []
+            },
+            widgetState: {
+                campaign_id: 'campaign_yellow_789012',
+                time_filter: '7d',
+                selected_metric: 'engagement',
+                last_updated: new Date().toISOString()
+            }
+        };
+        
+        const redCampaignData = {
+            toolOutput: {
+                campaign_id: 'campaign_red_345678',
+                delivery_rate: 0.65,
+                status: 'PAUSED_META',
+                quality_score: 'RED',
+                total_sent: 1000,
+                delivered: 650,
+                failed: 350,
+                performance_metrics: {
+                    delivery_rate: 0.65,
+                    open_rate: 0.08,
+                    click_rate: 0.005,
+                    response_rate: 0.002
+                },
+                quality_metrics: {
+                    quality_score: 'RED',
+                    spam_score: 0.15,
+                    engagement_score: 0.03
+                },
+                timeline: {
+                    started_at: '2024-01-20T10:00:00Z',
+                    completed_at: null,
+                    duration_hours: null
+                },
+                cost_analysis: {
+                    total_cost: 15.00,
+                    cost_per_message: 0.015,
+                    cost_per_delivery: 0.023
+                },
+                pacing_status: {
+                    template_pacing_active: false,
+                    held_messages: 0
+                },
+                meta_errors: []
+            },
+            widgetState: {
+                campaign_id: 'campaign_red_345678',
+                time_filter: 'all',
+                selected_metric: 'cost',
+                last_updated: new Date().toISOString()
+            }
+        };
+        
+        const pacingCampaignData = {
+            toolOutput: {
+                campaign_id: 'campaign_pacing_901234',
+                delivery_rate: 0.92,
+                status: 'RUNNING',
+                quality_score: 'YELLOW',
+                total_sent: 800,
+                delivered: 736,
+                failed: 64,
+                performance_metrics: {
+                    delivery_rate: 0.92,
+                    open_rate: 0.18,
+                    click_rate: 0.03,
+                    response_rate: 0.015
+                },
+                quality_metrics: {
+                    quality_score: 'YELLOW',
+                    spam_score: 0.06,
+                    engagement_score: 0.12
+                },
+                timeline: {
+                    started_at: '2024-01-20T10:00:00Z',
+                    completed_at: null,
+                    duration_hours: null
+                },
+                cost_analysis: {
+                    total_cost: 12.00,
+                    cost_per_message: 0.015,
+                    cost_per_delivery: 0.016
+                },
+                pacing_status: {
+                    template_pacing_active: true,
+                    held_messages: 45,
+                    pacing_reason: 'Evaluación de calidad por Meta'
+                },
+                meta_errors: []
+            },
+            widgetState: {
+                campaign_id: 'campaign_pacing_901234',
+                time_filter: '30d',
+                selected_metric: 'delivery',
+                last_updated: new Date().toISOString()
+            }
+        };
+        
+        const errorCampaignData = {
+            toolOutput: {
+                campaign_id: 'campaign_error_567890',
+                delivery_rate: 0.45,
+                status: 'FAILED',
+                quality_score: 'RED',
+                total_sent: 500,
+                delivered: 225,
+                failed: 275,
+                performance_metrics: {
+                    delivery_rate: 0.45,
+                    open_rate: 0.05,
+                    click_rate: 0.001,
+                    response_rate: 0.0005
+                },
+                quality_metrics: {
+                    quality_score: 'RED',
+                    spam_score: 0.25,
+                    engagement_score: 0.01
+                },
+                timeline: {
+                    started_at: '2024-01-20T10:00:00Z',
+                    completed_at: '2024-01-20T12:00:00Z',
+                    duration_hours: 2
+                },
+                cost_analysis: {
+                    total_cost: 7.50,
+                    cost_per_message: 0.015,
+                    cost_per_delivery: 0.033
+                },
+                pacing_status: {
+                    template_pacing_active: false,
+                    held_messages: 0
+                },
+                meta_errors: [
+                    {
+                        error_code: 131049,
+                        error_message: 'Marketing message limit per user exceeded',
+                        count: 150
+                    },
+                    {
+                        error_code: 131026,
+                        error_message: 'Message failed to send',
+                        count: 125
+                    }
+                ]
+            },
+            widgetState: {
+                campaign_id: 'campaign_error_567890',
+                time_filter: '7d',
+                selected_metric: 'delivery',
+                last_updated: new Date().toISOString()
+            }
+        };
+        
+        // Render components
+        const root1 = createRoot(document.getElementById('metrics-green'));
+        root1.render(h(CampaignMetricsWidget, { mockData: greenCampaignData }));
+        
+        const root2 = createRoot(document.getElementById('metrics-yellow'));
+        root2.render(h(CampaignMetricsWidget, { mockData: yellowCampaignData }));
+        
+        const root3 = createRoot(document.getElementById('metrics-red'));
+        root3.render(h(CampaignMetricsWidget, { mockData: redCampaignData }));
+        
+        const root4 = createRoot(document.getElementById('metrics-pacing'));
+        root4.render(h(CampaignMetricsWidget, { mockData: pacingCampaignData }));
+        
+        const root5 = createRoot(document.getElementById('metrics-error'));
+        root5.render(h(CampaignMetricsWidget, { mockData: errorCampaignData }));
+    </script>
+</body>
+</html>
+
+
+

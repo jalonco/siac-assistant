@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SIAC Assistant - Template Validation Card Test</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 30px;
+        }
+        .test-section {
+            margin-bottom: 40px;
+            padding: 20px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .test-section h2 {
+            color: #555;
+            margin-top: 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>SIAC Assistant - Template Validation Card</h1>
+        
+        <div class="test-section">
+            <h2>Default Template (Using window.openai API)</h2>
+            <div id="template-card-1"></div>
+        </div>
+        
+        <div class="test-section">
+            <h2>SUCCESS Scenario (Register Template)</h2>
+            <div id="template-card-2"></div>
+        </div>
+        
+        <div class="test-section">
+            <h2>FAILED Scenario (Correct Prompt)</h2>
+            <div id="template-card-3"></div>
+        </div>
+    </div>
+
+    <!-- React and ReactDOM from CDN -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    
+    <!-- Our bundled component -->
+    <script type="module" src="dist/template-validation-card.js"></script>
+    
+    <script type="module">
+        import TemplateValidationCard from './dist/template-validation-card.js';
+        
+        const { createElement: h } = React;
+        const { createRoot } = ReactDOM;
+        
+        // Mock ChatGPT Skybridge API for testing
+        window.openai = {
+            toolOutput: {
+                validation_status: 'SUCCESS',
+                template_name: 'Welcome Message',
+                passed_internal_checks: true,
+                category: 'Marketing',
+                language_code: 'es_ES'
+            },
+            toolResponseMetadata: {
+                raw_payload_for_preview: {
+                    template_name: 'Welcome Message',
+                    body_text: 'Welcome to our service! This is a comprehensive welcome message with {{1}} and {{2}}.',
+                    category: 'Marketing',
+                    language_code: 'es_ES',
+                    validation_rules_applied: ['Minimum length check', 'Spam content detection', 'Category-specific length limits'],
+                    validation_timestamp: new Date().toISOString(),
+                    estimated_review_time: '24-48 hours'
+                },
+                template_html_mockup: '<div class="template-preview">...</div>'
+            },
+            callTool: async (toolName, args) => {
+                console.log('Mock callTool:', toolName, args);
+                alert(`Mock: Calling tool ${toolName} with args: ${JSON.stringify(args)}`);
+            },
+            sendFollowUpMessage: async (message) => {
+                console.log('Mock sendFollowUpMessage:', message);
+                alert(`Mock: Sending follow-up message: ${message}`);
+            }
+        };
+        
+        // Test data for different scenarios
+        const successMockData = {
+            toolOutput: {
+                validation_status: 'SUCCESS',
+                template_name: 'Welcome Offer',
+                passed_internal_checks: true,
+                category: 'Marketing',
+                language_code: 'es_ES'
+            },
+            toolResponseMetadata: {
+                raw_payload_for_preview: {
+                    template_name: 'Welcome Offer',
+                    body_text: 'Welcome to our premium service! Get 20% off your first month with code {{1}}. Limited time offer!',
+                    category: 'Marketing',
+                    language_code: 'es_ES',
+                    validation_rules_applied: ['Minimum length check', 'Spam content detection', 'Category-specific length limits'],
+                    validation_timestamp: new Date().toISOString(),
+                    estimated_review_time: '24-48 hours'
+                },
+                template_html_mockup: '<div class="template-preview">...</div>'
+            }
+        };
+        
+        const failedMockData = {
+            toolOutput: {
+                validation_status: 'FAILED',
+                template_name: 'Spam Template',
+                passed_internal_checks: false,
+                category: 'Marketing',
+                language_code: 'en_US'
+            },
+            toolResponseMetadata: {
+                raw_payload_for_preview: {
+                    template_name: 'Spam Template',
+                    body_text: 'Buy now! Limited time spam offer!',
+                    category: 'Marketing',
+                    language_code: 'en_US',
+                    validation_rules_applied: ['Minimum length check', 'Spam content detection', 'Category-specific length limits'],
+                    validation_timestamp: new Date().toISOString(),
+                    estimated_review_time: '24-48 hours'
+                },
+                template_html_mockup: '<div class="template-preview">...</div>',
+                raw_validation_errors: {
+                    errors: [
+                        {
+                            field: 'body_text',
+                            message: 'Contains spam keywords',
+                            severity: 'error',
+                            suggestion: 'Remove promotional language and use more professional tone'
+                        },
+                        {
+                            field: 'body_text',
+                            message: 'Text too short for marketing category',
+                            severity: 'error',
+                            suggestion: 'Add more descriptive content about your service'
+                        }
+                    ],
+                    overall_status: 'FAILED'
+                }
+            }
+        };
+        
+        // Render components
+        const root1 = createRoot(document.getElementById('template-card-1'));
+        root1.render(h(TemplateValidationCard, {}));
+        
+        const root2 = createRoot(document.getElementById('template-card-2'));
+        root2.render(h(TemplateValidationCard, { mockData: successMockData }));
+        
+        const root3 = createRoot(document.getElementById('template-card-3'));
+        root3.render(h(TemplateValidationCard, { mockData: failedMockData }));
+    </script>
+</body>
+</html>

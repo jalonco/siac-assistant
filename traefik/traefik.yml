@@ -1,0 +1,84 @@
+# Traefik v2 - Configuración para SIAC Assistant
+# Configuración optimizada para SSL/TLS con Let's Encrypt
+
+# API Configuration
+api:
+  dashboard: true
+  insecure: true  # Dashboard en puerto 8080 sin SSL (solo local)
+
+# Entry Points
+entryPoints:
+  # HTTP (Puerto 80) - Redirige automáticamente a HTTPS
+  web:
+    address: ":80"
+    http:
+      redirections:
+        entryPoint:
+          to: websecure
+          scheme: https
+          permanent: true
+
+  # HTTPS (Puerto 443)
+  websecure:
+    address: ":443"
+    http:
+      tls:
+        certResolver: le
+        domains:
+          - main: api.siac-app.com
+          - main: auth.siac-app.com
+
+# Let's Encrypt Certificate Resolver
+certificatesResolvers:
+  le:
+    acme:
+      email: admin@siac-app.com  # Cambiar por email real
+      storage: /letsencrypt/acme.json
+      caServer: https://acme-v02.api.letsencrypt.org/directory
+      
+      # HTTP Challenge (más confiable)
+      httpChallenge:
+        entryPoint: web
+      
+      # DNS Challenge (opcional, comentado)
+      # dnsChallenge:
+      #   provider: cloudflare
+      #   delayBeforeCheck: 0
+
+# Docker Provider
+providers:
+  docker:
+    endpoint: "unix:///var/run/docker.sock"
+    exposedByDefault: false
+    network: traefik-public
+    watch: true
+
+  # File Provider (para configuración adicional)
+  file:
+    directory: /etc/traefik/dynamic
+    watch: true
+
+# Logging
+log:
+  level: INFO
+  format: json
+
+# Access Logs
+accessLog:
+  format: json
+
+# Global Configuration
+global:
+  checkNewVersion: true
+  sendAnonymousUsage: false
+
+# Metrics (opcional)
+# metrics:
+#   prometheus:
+#     buckets:
+#       - 0.1
+#       - 0.3
+#       - 1.2
+#       - 5.0
+
+
