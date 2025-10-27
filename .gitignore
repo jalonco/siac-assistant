@@ -84,3 +84,11 @@ connect_vps.sh
 connect_vps.py
 quick_*.sh
 
+# Documentación con información sensible del VPS
+Conexion VPS Mejorada/
+*VPS*.md
+diagnose_ssl.sh
+fix_ssl_configuration.sh
+setup_ssl.sh
+verify_*.sh
+

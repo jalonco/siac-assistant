@@ -1,168 +1,230 @@
-# SIAC Assistant
+# SIAC Assistant - MCP Server with OAuth 2.1
 
-Sistema de Asistencia Inteligente con Capacidades Avanzadas (SIAC Assistant) - Backend FastMCP con PostgreSQL.
+![License](https://img.shields.io/badge/license-MIT-blue.svg)
+![Python](https://img.shields.io/badge/python-3.11+-blue.svg)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.104+-green.svg)
 
-## Estructura del Proyecto
+Sistema de integración MCP (Model Context Protocol) para SIAC con autenticación OAuth 2.1, diseñado para conectarse con ChatGPT y otros clientes MCP.
+
+## 🚀 Características
+
+- **OAuth 2.1 Authentication** - Servidor de autorización completo con RFC 7591 (Dynamic Client Registration)
+- **MCP Protocol** - Implementación completa del protocolo MCP 2024-11-05
+- **RFC 8707** - Protected Resource Metadata para descubrimiento de servicios
+- **PKCE Support** - Proof Key for Code Exchange para mayor seguridad
+- **FastAPI Backend** - API moderna y eficiente
+- **Docker Support** - Despliegue fácil con Docker Compose
+- **SSL/TLS** - Configuración completa para producción
+- **Token Verification** - Sistema robusto de validación de tokens
+
+## 📋 Requisitos
+
+- Python 3.11+
+- Docker & Docker Compose (opcional, para deployment)
+- PostgreSQL (para producción)
+- Node.js 18+ (para componentes web)
+
+## 🏗️ Arquitectura
 
 ```
-SIAC Assistant/
-├── server/                 # Backend FastMCP
-│   ├── main.py            # Punto de entrada principal
-│   ├── requirements.txt   # Dependencias de Python
-│   ├── Dockerfile         # Configuración Docker para backend
-│   ├── .dockerignore      # Archivos ignorados en Docker
-│   └── venv/              # Entorno virtual de Python
-├── web/                   # Frontend React/TypeScript (futuro)
-└── docker-compose.yml     # Configuración de servicios Docker
+┌─────────────────┐
+│   ChatGPT/      │
+│   MCP Client    │
+└────────┬────────┘
+         │ HTTPS + OAuth 2.1
+         ▼
+┌─────────────────────────────────┐
+│   SIAC Assistant MCP Server     │
+│   (FastAPI + MCP Protocol)      │
+│                                 │
+│   ┌─────────────────────────┐  │
+│   │  OAuth Authorization    │  │
+│   │  Server                 │  │
+│   └─────────────────────────┘  │
+│                                 │
+│   ┌─────────────────────────┐  │
+│   │  MCP Handler            │  │
+│   │  (JSON-RPC 2.0)         │  │
+│   └─────────────────────────┘  │
+└─────────────────────────────────┘
+         │
+         ▼
+┌─────────────────┐
+│   PostgreSQL    │
+│   Database      │
+└─────────────────┘
 ```
 
-## Servicios Docker
+## 🛠️ Instalación Local
 
-### Base de Datos PostgreSQL
-- **Usuario**: siac
-- **Contraseña**: siac123
-- **Base de datos**: siac_chatgpt
-- **Puerto**: 5432
+### 1. Clonar el repositorio
 
-### Backend FastMCP
-- **Puerto**: 8000
-- **Framework**: FastAPI + MCP
-- **Base de datos**: PostgreSQL
-
-## Dependencias Principales
-
-- **FastAPI**: Framework web moderno y rápido
-- **Uvicorn**: Servidor ASGI de alto rendimiento
-- **MCP**: Model Context Protocol SDK
-- **SQLAlchemy**: ORM para Python
-- **PostgreSQL**: Base de datos relacional
-- **Alembic**: Migraciones de base de datos
-
-## Configuración del Entorno
-
-### Desarrollo Local
-
-1. **Activar entorno virtual**:
-   ```bash
-   cd server
-   source venv/bin/activate
-   ```
-
-2. **Instalar dependencias**:
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-3. **Ejecutar servidor**:
-   ```bash
-   python main.py
-   ```
-
-### Docker
-
-1. **Construir y ejecutar servicios**:
-   ```bash
-   docker-compose up --build
-   ```
-
-2. **Ejecutar en segundo plano**:
-   ```bash
-   docker-compose up -d
-   ```
-
-3. **Ver logs**:
-   ```bash
-   docker-compose logs -f
-   ```
-
-## Endpoints Disponibles
-
-### Endpoints Públicos (Sin Autenticación)
-- `GET /`: Información básica del servicio
-- `GET /health`: Verificación de salud del servicio
-- `GET /auth/info`: Información de configuración OAuth 2.1
-
-### Endpoints Protegidos (OAuth 2.1 Requerido)
-- `GET /protected/user`: Información del usuario autenticado
-- `GET /protected/test`: Endpoint de prueba para recursos protegidos
-
-## Autenticación OAuth 2.1
-
-### Configuración
-- **Issuer URL**: `https://auth.siac-app.com`
-- **Resource Server**: `https://api.siac-app.com/mcp`
-- **Scope Requerido**: `siac.user.full_access`
-- **Audience**: `siac-assistant`
-
-### Flujo de Autenticación
-1. El cliente debe obtener un access token del Authorization Server
-2. Incluir el token en el header: `Authorization: Bearer <token>`
-3. El servidor valida: issuer, audience, expiración y scopes
-4. Si falla la validación, retorna `401 Unauthorized` con header `WWW-Authenticate`
-
-### Testing
 ```bash
-# Ejecutar tests de autenticación
-python test_auth.py
-
-# Ejecutar tests de herramientas read-only
-python test_readonly_tools.py
-
-# Ejecutar tests de herramientas write-action
-python test_write_tools.py
+git clone https://github.com/tu-usuario/siac-assistant.git
+cd siac-assistant
 ```
 
-## Herramientas MCP Disponibles
+### 2. Configurar entorno Python
 
-### Herramientas de Solo Lectura (Read-Only)
+```bash
+# Crear entorno virtual
+python -m venv venv
+source venv/bin/activate  # En Windows: venv\Scripts\activate
 
-#### siac.validate_template
-- **Propósito**: Validar plantillas de WhatsApp para cumplimiento, calidad y estado de aprobación
-- **Parámetros**:
-  - `template_name` (string): Nombre de la plantilla
-  - `body_text` (string): Contenido del texto de la plantilla
-  - `category` (string): Categoría (Marketing, Utility, Authentication)
-  - `language_code` (string): Código de idioma (ej. 'es_ES')
-- **UI Widget**: `TemplateValidationCard.html`
-- **readOnlyHint**: `true`
+# Instalar dependencias del servidor
+pip install -r server/requirements.txt
 
-#### siac.get_campaign_metrics
-- **Propósito**: Obtener métricas detalladas y datos de rendimiento de campañas específicas
-- **Parámetros**:
-  - `campaign_id` (string): UUID de la campaña a consultar
-- **UI Widget**: `CampaignMetricsWidget.html`
-- **readOnlyHint**: `true`
+# Instalar dependencias del auth server
+pip install -r auth_server/requirements.txt
+```
 
-### Herramientas de Escritura (Write Actions)
+### 3. Configurar variables de entorno
 
-#### siac.register_template
-- **Propósito**: Registrar una plantilla validada en SIAC y enviarla a Meta para aprobación final
-- **Parámetros**:
-  - `template_id` (string): UUID de la plantilla a registrar
-  - `meta_template_id` (string): ID de Meta después de la subida
-  - `client_id` (string): UUID del cliente para trazabilidad
-- **Widget Accessible**: `true` (TemplateValidationCard puede invocar esta herramienta)
-- **Autenticación**: OAuth 2.1 requerido
-- **Confirmación**: Requiere confirmación explícita del usuario
+```bash
+cp .env.example .env
+# Editar .env con tus configuraciones
+```
 
-#### siac.send_broadcast
-- **Propósito**: Programar y enviar una campaña de difusión a un segmento específico de clientes
-- **Parámetros**:
-  - `template_id` (string): UUID de la plantilla aprobada
-  - `segment_name` (string): Nombre del segmento de clientes (ej. 'clientes_recurrentes')
-  - `schedule_time_utc` (string): Fecha y hora programada en UTC (ISO 8601)
-- **UI Widget**: `BroadcastConfirmationCard.html`
-- **Autenticación**: OAuth 2.1 requerido
-- **Confirmación**: Requiere confirmación explícita del usuario
+### 4. Ejecutar en desarrollo
 
-### Herramientas Generales
-- `get_user_info`: Información del usuario actual
-- `test_protected_action`: Acción protegida de prueba
+```bash
+# Terminal 1: Auth Server
+cd auth_server
+uvicorn main:app --reload --port 8080
 
-## Próximos Pasos
+# Terminal 2: MCP Server
+cd server
+uvicorn main:app --reload --port 8888
+```
 
-1. Configuración de modelos de base de datos
-2. Implementación de endpoints MCP
-3. Desarrollo del frontend React/TypeScript
-4. Configuración de autenticación y autorización
-5. Implementación de funcionalidades de IA
+## 🐳 Despliegue con Docker
+
+### Desarrollo
+
+```bash
+docker-compose up -d
+```
+
+### Producción
+
+```bash
+docker-compose -f docker-compose.production.yml up -d
+```
+
+## 📡 Endpoints Principales
+
+### OAuth 2.1 Server (`auth.siac-app.com`)
+
+- `GET /.well-known/openid-configuration` - OpenID Connect Discovery
+- `POST /oauth/register` - Dynamic Client Registration (RFC 7591)
+- `GET /oauth/authorize` - Authorization Endpoint
+- `POST /oauth/token` - Token Endpoint
+- `GET /oauth/userinfo` - UserInfo Endpoint
+
+### MCP Server (`api.siac-app.com/mcp`)
+
+- `GET /.well-known/oauth-protected-resource` - Protected Resource Metadata (RFC 8707)
+- `POST /mcp` - MCP Protocol Handler (JSON-RPC 2.0)
+  - `initialize` - Inicializar conexión
+  - `tools/list` - Listar herramientas disponibles
+  - `tools/call` - Ejecutar herramientas
+  - `resources/list` - Listar recursos
+  - `prompts/list` - Listar prompts
+
+## 🔧 Configuración de ChatGPT
+
+1. En ChatGPT, ir a **Settings** → **Beta Features** → **Custom GPTs & Actions**
+2. Crear nuevo **Custom Action**
+3. Configurar MCP Server:
+   - **URL**: `https://api.siac-app.com/mcp`
+   - **Authentication**: OAuth 2.1
+4. ChatGPT se registrará automáticamente usando Dynamic Client Registration
+
+## 🛡️ Seguridad
+
+- OAuth 2.1 con PKCE obligatorio
+- Tokens JWT firmados (en producción)
+- HTTPS obligatorio en producción
+- Rate limiting implementado
+- CORS configurado apropiadamente
+- Validación estricta de scopes
+
+## 🧪 Testing
+
+```bash
+# Tests unitarios
+pytest server/test_*.py
+
+# Test de conexión MCP
+python test_mcp_server.py
+
+# Test de flujo OAuth
+python test_security_flow.py
+```
+
+## 📚 Documentación Adicional
+
+- [Guía de Conexión con ChatGPT](CHATGPT_CONNECTION_GUIDE.md)
+- [Documentación del Auth Server](AUTH_SERVER_DOCUMENTATION.md)
+- [Guía de Ejecución Local](LOCAL_EXECUTION_GUIDE.md)
+- [Instrucciones de Deployment](DEPLOYMENT_INSTRUCTIONS.md)
+- [Configuración SSL](SSL_CONFIGURATION.md)
+- [Resumen de Seguridad](SECURITY_FLOW_SUMMARY.md)
+
+## 🏗️ Estructura del Proyecto
+
+```
+siac-assistant/
+├── auth_server/          # Servidor de autorización OAuth 2.1
+│   ├── main.py          # Implementación del auth server
+│   └── requirements.txt
+├── server/              # Servidor MCP principal
+│   ├── main.py         # Implementación MCP + FastAPI
+│   ├── schemas.py      # Modelos Pydantic
+│   └── requirements.txt
+├── web/                # Componentes web (React/TypeScript)
+│   └── src/
+├── traefik/            # Configuración del reverse proxy
+├── docker-compose.yml  # Desarrollo
+└── README.md
+```
+
+## 🤝 Contribución
+
+Las contribuciones son bienvenidas. Por favor:
+
+1. Fork el proyecto
+2. Crea una rama para tu feature (`git checkout -b feature/AmazingFeature`)
+3. Commit tus cambios (`git commit -m 'Add some AmazingFeature'`)
+4. Push a la rama (`git push origin feature/AmazingFeature`)
+5. Abre un Pull Request
+
+## 📝 Estándares de Código
+
+- Seguir PEP 8 para Python
+- Usar type hints en todas las funciones
+- Documentar con docstrings (Google style)
+- Nombres descriptivos de variables y funciones
+- Tests para nuevas funcionalidades
+
+## 📄 Licencia
+
+Este proyecto está bajo la Licencia MIT - ver el archivo [LICENSE](LICENSE) para más detalles.
+
+## 👥 Autores
+
+- **SIAC Enterprise** - *Trabajo inicial*
+
+## 🙏 Agradecimientos
+
+- [FastAPI](https://fastapi.tiangolo.com/) - Framework web moderno
+- [MCP Protocol](https://modelcontextprotocol.io/) - Protocolo de contexto de modelo
+- [OAuth 2.1](https://oauth.net/2.1/) - Estándar de autorización
+
+## 📞 Soporte
+
+Para soporte, por favor abre un issue en GitHub o contacta al equipo de desarrollo.
+
+---
+
+**Nota**: Este es un proyecto en desarrollo activo. Las características y la API pueden cambiar.
