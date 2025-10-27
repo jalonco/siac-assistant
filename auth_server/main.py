@@ -2,14 +2,19 @@
 # Microservicio minimalista para autenticación y autorización
 
 from fastapi import FastAPI, HTTPException, Request, Response, Form
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse, HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 from typing import Dict, Any, Optional
 import json
 import logging
 from datetime import datetime, timedelta
 import uuid
+from pathlib import Path
+
+# Importar base de datos de usuarios
+from database import user_db
 
 # Configuración de logging
 logging.basicConfig(level=logging.INFO)
@@ -36,6 +41,10 @@ app.add_middleware(
     allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],
 )
+
+# Configurar templates de Jinja2
+templates_dir = Path(__file__).parent / "templates"
+templates = Jinja2Templates(directory=str(templates_dir))
 
 # Configuración del servidor de autorización
 AUTH_SERVER_CONFIG = {
@@ -209,12 +218,13 @@ async def register_client(request: Request):
             detail=f"Error en registro de cliente: {str(e)}"
         )
 
-# Endpoint de autorización (Mock)
-@app.get("/oauth/authorize")
+# Endpoint de autorización con Login Real
+@app.get("/oauth/authorize", response_class=HTMLResponse)
 async def authorize(request: Request):
     """
-    Endpoint de autorización OAuth 2.1
-    En un entorno real, aquí se mostraría la página de login
+    Endpoint de autorización OAuth 2.1 con página de login real.
+    
+    Muestra una página de login donde el usuario ingresa sus credenciales.
     """
     logger.info("Solicitud de autorización recibida")
     
@@ -239,26 +249,91 @@ async def authorize(request: Request):
     
     # Si no se proporciona scope, usar el scope por defecto
     scope = params.get("scope", "siac.user.full_access")
-    params["scope"] = scope
     
-    logger.info(f"Solicitud de autorización - Client ID: {params['client_id']}, Scope: {scope}")
+    logger.info(f"Mostrando página de login - Client ID: {params['client_id']}, Scope: {scope}")
     
-    # En un entorno real, aquí se mostraría la página de login
-    # Por ahora, simulamos una autorización exitosa
+    # Renderizar página de login
+    return templates.TemplateResponse("login.html", {
+        "request": request,
+        "client_id": params["client_id"],
+        "client_name": "ChatGPT (OpenAI)",
+        "redirect_uri": params["redirect_uri"],
+        "response_type": params["response_type"],
+        "scope": scope,
+        "state": params.get("state", ""),
+        "code_challenge": params.get("code_challenge", ""),
+        "code_challenge_method": params.get("code_challenge_method", "")
+    })
+
+# Endpoint de login (POST)
+@app.post("/oauth/login")
+async def login(
+    request: Request,
+    email: str = Form(...),
+    password: str = Form(...),
+    client_id: str = Form(...),
+    redirect_uri: str = Form(...),
+    response_type: str = Form(...),
+    scope: str = Form(...),
+    state: str = Form(None),
+    code_challenge: str = Form(None),
+    code_challenge_method: str = Form(None)
+):
+    """
+    Procesa el login del usuario y genera el código de autorización.
+    
+    Args:
+        email: Email del usuario
+        password: Contraseña del usuario
+        client_id: ID del cliente OAuth
+        redirect_uri: URI de redirección
+        response_type: Tipo de respuesta (debe ser "code")
+        scope: Scopes solicitados
+        state: State parameter para CSRF protection
+        code_challenge: PKCE code challenge
+        code_challenge_method: PKCE method (S256)
+        
+    Returns:
+        Redirección al redirect_uri con el código de autorización
+    """
+    logger.info(f"Intento de login - Email: {email}, Client ID: {client_id}")
+    
+    # Autenticar usuario
+    user = user_db.authenticate_user(email, password)
+    
+    if not user:
+        logger.warning(f"Login fallido para: {email}")
+        # Redirigir de vuelta al formulario de login con error
+        error_url = f"/oauth/authorize?response_type={response_type}&client_id={client_id}&redirect_uri={redirect_uri}&scope={scope}&state={state}&error=invalid_credentials"
+        if code_challenge:
+            error_url += f"&code_challenge={code_challenge}&code_challenge_method={code_challenge_method}"
+        return RedirectResponse(url=error_url, status_code=303)
+    
+    # Usuario autenticado exitosamente
+    logger.info(f"Login exitoso - Usuario: {user['email']}, Cliente: {user['client_name']}")
+    
+    # Generar código de autorización
     authorization_code = f"auth_code_{uuid.uuid4().hex[:16]}"
     
-    # Construir URL de redirección con el código de autorización
-    redirect_uri = params["redirect_uri"]
-    state = params.get("state", "")
+    # Almacenar el código asociado al usuario
+    user_db.store_authorization_code(
+        code=authorization_code,
+        user_id=user["user_id"],
+        client_id=client_id,
+        redirect_uri=redirect_uri,
+        scope=scope,
+        code_challenge=code_challenge
+    )
     
+    # Construir URL de redirección
     redirect_url = f"{redirect_uri}?code={authorization_code}"
     if state:
         redirect_url += f"&state={state}"
     
-    logger.info(f"Código de autorización generado: {authorization_code}")
+    logger.info(f"Código de autorización generado para {user['email']}: {authorization_code}")
     logger.info(f"Redirección a: {redirect_url}")
     
-    # Redirigir al usuario al redirect_uri con el código de autorización
+    # Redirigir al cliente con el código
     return RedirectResponse(url=redirect_url, status_code=302)
 
 # Endpoint de token (Mock)
@@ -300,6 +375,59 @@ async def token(
                 status_code=400,
                 detail="redirect_uri requerido"
             )
+        
+        # Validar y obtener el código de autorización
+        code_data = user_db.get_authorization_code(code)
+        
+        if not code_data:
+            logger.warning(f"Código de autorización inválido o expirado: {code}")
+            raise HTTPException(
+                status_code=400,
+                detail="Código de autorización inválido o expirado"
+            )
+        
+        # Validar que el redirect_uri coincida
+        if code_data["redirect_uri"] != redirect_uri:
+            logger.warning(f"redirect_uri no coincide para el código: {code}")
+            raise HTTPException(
+                status_code=400,
+                detail="redirect_uri no coincide"
+            )
+        
+        # Obtener información del usuario
+        user = user_db.get_user_by_id(code_data["user_id"])
+        
+        if not user:
+            logger.error(f"Usuario no encontrado para el código: {code}")
+            raise HTTPException(
+                status_code=500,
+                detail="Error interno del servidor"
+            )
+        
+        # Generar tokens reales asociados al usuario
+        access_token = f"access_token_{uuid.uuid4().hex[:32]}"
+        new_refresh_token = f"refresh_token_{uuid.uuid4().hex[:32]}"
+        
+        # Almacenar el token con la información del usuario
+        user_db.store_token(
+            token=access_token,
+            user_id=user["user_id"],
+            client_id=code_data["client_id"],
+            scope=code_data["scope"]
+        )
+        
+        # Configurar expiración del token (24 horas)
+        expires_in = 86400
+        
+        logger.info(f"Access token generado para {user['email']} (Cliente: {user['client_name']}): {access_token[:20]}...")
+        
+        return TokenResponse(
+            access_token=access_token,
+            token_type="Bearer",
+            expires_in=expires_in,
+            refresh_token=new_refresh_token,
+            scope=code_data["scope"]
+        )
     
     elif grant_type == "refresh_token":
         if not refresh_token:
@@ -307,24 +435,60 @@ async def token(
                 status_code=400,
                 detail="refresh_token requerido"
             )
+        
+        # Para simplificar, generar un nuevo token
+        # En producción, validar el refresh_token contra la base de datos
+        access_token = f"access_token_{uuid.uuid4().hex[:32]}"
+        new_refresh_token = f"refresh_token_{uuid.uuid4().hex[:32]}"
+        
+        expires_in = 86400
+        
+        return TokenResponse(
+            access_token=access_token,
+            token_type="Bearer",
+            expires_in=expires_in,
+            refresh_token=new_refresh_token,
+            scope=scope or "siac.user.full_access"
+        )
+
+# Endpoint de información del token
+@app.post("/oauth/tokeninfo")
+async def tokeninfo(token: str = Form(...)):
+    """
+    Endpoint para validar y obtener información de un token.
     
-    # En un entorno real, aquí se validaría el código de autorización y el code_verifier (PKCE)
-    # Por ahora, simulamos la generación de un token
-    access_token = f"access_token_{uuid.uuid4().hex[:32]}"
-    new_refresh_token = f"refresh_token_{uuid.uuid4().hex[:32]}"
+    Args:
+        token: Access token a validar
+        
+    Returns:
+        Información del usuario y el token
+    """
+    logger.info(f"Solicitud de validación de token: {token[:20]}...")
     
-    # Configurar expiración del token (1 hora)
-    expires_in = 3600
+    # Obtener información del token desde la base de datos
+    token_data = user_db.get_token_info(token)
     
-    logger.info(f"Access token generado para client {client_id}: {access_token[:20]}...")
+    if not token_data:
+        raise HTTPException(
+            status_code=401,
+            detail="Token inválido o expirado"
+        )
     
-    return TokenResponse(
-        access_token=access_token,
-        token_type="Bearer",
-        expires_in=expires_in,
-        refresh_token=new_refresh_token,
-        scope=scope or "siac.user.full_access"
-    )
+    user = token_data["user"]
+    
+    # Retornar información del token y el usuario
+    return {
+        "active": True,
+        "user_id": user["user_id"],
+        "email": user["email"],
+        "name": user["name"],
+        "client_id": user["client_id"],
+        "client_name": user["client_name"],
+        "roles": user["roles"],
+        "permissions": user["permissions"],
+        "scope": token_data["scope"],
+        "expires_at": token_data["expires_at"]
+    }
 
 # Endpoint de información del usuario (Mock)
 @app.get("/oauth/userinfo")
