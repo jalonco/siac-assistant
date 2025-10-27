@@ -40,6 +40,8 @@ COPY --from=builder /root/.local /home/auth/.local
 
 # Copiar código de la aplicación
 COPY main.py .
+COPY database.py .
+COPY templates/ ./templates/
 
 # Crear directorio para logs
 RUN mkdir -p /app/logs && chown -R auth:auth /app
